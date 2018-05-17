@@ -1,0 +1,279 @@
+---
+title: "Analise De Agrupamentos"
+author: "gsh87"
+date: "maio 2018"
+output: 
+  flexdashboard::flex_dashboard:
+    vertical_layout: scroll
+    smooth_scroll: TRUE
+---
+
+<style type="text/css">
+
+.chart-title {  /* chart_title  */
+   font-size: 20px;
+</style>
+
+
+<!-- ################################################# -->
+
+```{r,echo=FALSE,include=FALSE}
+################################### 0 - Limpeza
+# removendo lixo da memoria
+rm(list=ls())
+set.seed(123)
+```
+
+```{r,echo=FALSE,results='hide',warning=FALSE,message=FALSE}
+## 1 - Pacotes
+options(repos=c(CRAN="http://vps.fmvz.usp.br/CRAN/"))
+library(pacman)    # pacote para load das bibliotecas
+p_load(stats)     #  Modelos ARIMA
+p_load(agricolae)# testes
+p_load(lmtest)    # testes de residuos
+p_load(randtests) # pacotes de testes estatisticos
+p_load(rms)       # pacote para stepwise
+p_load(forecast)  # forecast
+p_load(smooth)    # SMA - simple moving average
+p_load(nnfor)     # neural networks for time series
+p_load(h2o)
+p_load(fBasics)   # estatistica basica
+
+p_load(fpc)      # Flexible Procedures for Clustering
+p_load(factoextra) #factoextra for visualizing clusters using ggplot2 plotting system
+p_load(cluster)   # cluster for computing pam and for analyzing cluster silhouettes
+p_load(NbClust) #NbClust for finding the optimal number of clusters
+p_load(factoextra) # numero otimo de clusters
+
+## pacotes graficos ##
+p_load(ggplot2)   # grafico
+p_load(ggthemes)  # grafico 
+p_load(gridExtra) # Graficos em matrizes
+p_load(plotly)    # interative graphics
+p_load(ggcorrplot) # correlacao
+p_load(ggExtra)     # Add marginal Histogram
+p_load(ggalt)        # circulos no ggplot
+
+## pacotes de manipulacao ##
+p_load(lubridate) # tratamento de datas
+p_load(plyr)     # empilhamento
+p_load(magrittr)   # pipeline
+p_load(dplyr)      # manipulacao de base
+p_load(knitr)       # apresentacao
+p_load(binomTools)   # extrai
+p_load(vcd)          
+p_load(DescTools)      # summary grafico
+p_load(RODBC)          # conexao ODC
+p_load(sqldf)          # sqldf
+p_load(corrplot)       # correlacao
+p_load(prais)
+p_load(Metrics)
+p_load(dummies)
+p_load(reshape2)       # empilha as colunas usando uma flag
+
+## Packages visual
+p_load(flexdashboard)
+p_load(DT)
+
+
+p_load(factoextra) #factoextra for visualizing clusters using ggplot2 plotting system
+p_load(cluster)   # cluster for computing pam and for analyzing cluster silhouettes
+p_load(NbClust) #NbClust for finding the optimal number of clusters
+
+```
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+p_load(datasets)
+
+Base_iris <- iris %>% mutate(
+  flag_Sep_comprimento = ifelse(Sepal.Length>=(mean(Sepal.Length)+sd(Sepal.Length)),1,0),
+  flag_Sep_largura = ifelse(Sepal.Width>=(mean(Sepal.Width)+sd(Sepal.Width)),1,0)) %>% `colnames<-`(c("Sepal_Length","Sepal_Width","Petala_Length","Petala_Width","Classificacao","flag_Sep_comprimento","flag_Sep_largura"))
+
+
+
+```
+
+
+
+# Agrupamentos Kmeans {data-orientation=rows}
+
+Row 
+-------------------------------------
+### Cluster: Visualizacao
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+df <- iris[c(1, 2, 3, 4)]
+pca_mod <- prcomp(df)  # compute principal components
+
+# Data frame of principal components ----------------------
+df_pc <- data.frame(pca_mod$x, Species=iris$Species)  # dataframe of principal components
+df_pc_vir <- df_pc[df_pc$Species == "virginica", ]  # df for 'virginica'
+df_pc_set <- df_pc[df_pc$Species == "setosa", ]  # df for 'setosa'
+df_pc_ver <- df_pc[df_pc$Species == "versicolor", ]  # df for 'versicolor'
+ 
+# Plot ----------------------------------------------------
+Grafico15 <- ggplot(df_pc, aes(PC1, PC2, col=Species)) + 
+  geom_point(aes(shape=Species), size=2) +   # draw points
+  labs(title="Clusterização", 
+       subtitle="Clusterização com componentes principais",
+       caption="Source: Iris") + 
+  coord_cartesian(xlim = 1.2 * c(min(df_pc$PC1), max(df_pc$PC1)), 
+                  ylim = 1.2 * c(min(df_pc$PC2), max(df_pc$PC2))) +   # change axis limits
+  geom_encircle(data = df_pc_vir, aes(x=PC1, y=PC2)) +   # draw circles
+  geom_encircle(data = df_pc_set, aes(x=PC1, y=PC2)) + 
+  geom_encircle(data = df_pc_ver, aes(x=PC1, y=PC2))
+
+Grafico15
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Cluster: Kmeans
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+
+
+Base_Cluster <- Base_iris %>% select("Sepal_Length","Sepal_Width","Petala_Length","Petala_Width") %>% scale()
+# K-Means Clustering with 5 clusters
+fit <- kmeans(Base_Cluster, 3)
+
+# Cluster Plot against 1st 2 principal components
+
+# vary parameters for most readable graph
+require(cluster) 
+clusplot(Base_Cluster, fit$cluster, color=TRUE, shade=TRUE, 
+  	labels=2, lines=1,main="Clusterizacao")
+
+```
+
+### Kmeans Impressão dos Grupos
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+# Centroid Plot against 1st 2 discriminant functions
+require(fpc)
+plotcluster(Base_Cluster, fit$cluster,main="Grupos")
+```
+
+###  Analise do numero otimo de clusters
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+#total within-cluster sum of square (wss) 
+# Compute and plot wss for k = 2 to k = 15
+k.max <- 10 # Maximal number of clusters
+data <- Base_Cluster
+wss <- sapply(1:k.max,function(k){kmeans(data, k, nstart=10 )$tot.withinss})
+
+plot(1:k.max, wss,
+       type="b", pch = 19, frame = FALSE, 
+       xlab="Number of clusters K",
+       ylab="Total within-clusters sum of squares")
+abline(v = 3, lty =2)
+```
+
+
+###  Numero otimo de clusters: factoextra wss
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+grafico_wss <- fviz_nbclust(Base_Cluster, kmeans, method = "wss") +
+    geom_vline(xintercept = 3, linetype = 2)
+grafico_wss
+```
+
+
+###  Numero otimo de clusters: factoextra Silhoeta
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+grafico_wss2 <- fviz_nbclust(Base_Cluster, kmeans, method = "silhouette") 
+grafico_wss2
+```
+
+###  Numero otimo de clusters: nbClust
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE,include = FALSE}
+set.seed(123)
+require(factoextra)
+require(NbClust)
+nb <- NbClust(Base_Cluster, distance = "euclidean", min.nc = 2,
+        max.nc = 10, method = "complete", index ="all")
+```
+
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+require(NbClust)
+
+Grafico_nb <- fviz_nbclust(nb) + theme_minimal()
+
+```
+
+###  Numero otimo de clusters: nbClust Grafico
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+require(NbClust)
+
+Grafico_nb
+
+```
+
+Row {.tabset .tabset-fade}
+-------------------------------------
+### Agrupamentos Hierarquicos
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+Base_Hierarquico <- Base_iris %>% select("Sepal_Length","Sepal_Width","Petala_Length","Petala_Width") %>% scale()
+
+# Compute pairewise distance matrices
+dist.res <- dist(Base_Hierarquico, method = "euclidean")
+# Hierarchical clustering results
+hc <- hclust(dist.res, method = "complete")
+# Visualization of hclust
+plot(hc, labels = FALSE, hang = -1)
+# Add rectangle around 3 groups
+rect.hclust(hc, k = 3, border = 2:4) 
+
+
+#Cut into 3 groups
+rotulos <- cutree(hc, k = 3)
+
+```
+
+###  Numero otimo de clusters: factoextra
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+grafico_hcut <- fviz_nbclust(Base_Hierarquico, hcut, method = "wss") +
+    geom_vline(xintercept = 3, linetype = 2)
+grafico_wss
+```
+
+
+###  Numero otimo de clusters: factoextra Silhoeta
+
+```{r,echo=FALSE,warning=FALSE,fig.align='center',warning=FALSE,message=FALSE}
+set.seed(123)
+require(factoextra)
+grafico_wss3 <- fviz_nbclust(Base_Hierarquico, kmeans, method = "silhouette") 
+grafico_wss3
+```
+
+
+
+# Referência {data-orientation=rows}
+
+Row 
+-------------------------------------
+
+
+* [Graficos](http://http://r-statistics.co/Top50-Ggplot2-Visualizations-MasterList-R-Code.html)
+
+* [Clusters](http://www.sthda.com/english/wiki/print.php?id=239)
+  
+
